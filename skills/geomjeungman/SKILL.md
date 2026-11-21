@@ -1,14 +1,23 @@
 ---
 name: geomjeungman
-description: Navigate to the screen the user describes, then capture it at several window or viewport sizes with measured dimensions. Use for 검증맨, responsive checks, and layout checks after UI work.
+description: 사용자가 말로 설명한 화면까지 이동하고 여러 창 크기에서 실제 크기와 스크린샷을 남긴다. 검증맨 호출, 반응형 확인, UI 변경 후 화면 점검에 사용한다.
 ---
 
 # 검증맨
 
-1. Resolve the app or URL, the screen to reach, and the sizes to try from the user's request and project. For a desktop app, try its normal size, minimum width at normal height, then its minimum size. For Morrow these are `1080x760`, `640x760`, and `640x600`. For a website without project sizes, use `1440x900`, `390x900`, and `390x600`.
-2. Use a dedicated `agent-browser --session <name>` session. Open the website or, for Electron, attach to the app's loopback DevTools port with `agent-browser --session <name> connect <port>` and select the app tab. Use the project's development launch instructions if the app is not running. Confirm the target before interacting.
-3. Use `snapshot` and non-persisting UI actions to reach the requested state. Verify that the requested heading, dialog, or menu is visible. Identify a stable CSS selector for that state and pass it to `--require` so the script can detect if resizing closes it.
-4. Run `python3 <this-skill-directory>/scripts/capture.py --session <name> --require '<selector>' <width>x<height> ...`. Add `--electron` for a native Electron window, with a fresh session and no viewport or device emulation. If a resize dismisses a menu, add `--reopen '<opener-selector>'` for the known button that reopens it without saving changes. The script restores the starting size after capture.
-5. Report each requested size, measured size, and screenshot path. For Electron, report the window and the rendered viewport separately. Use Chrome DevTools MCP on the same target if investigating a suspected layout issue. Base any finding on the screenshot or measured DOM. The capture script only verifies the requested screen and sizes; it does not grade the layout.
+1. 사용자 요청과 프로젝트에서 검사할 앱 또는 주소, 화면, 크기를 정한다. 데스크톱 앱은 기본 창 크기 → 기본 높이에서 최소 너비 → 최소 창 크기 순으로 확인한다. Morrow에서는 `1080x760`, `640x760`, `640x600`이다. 웹사이트에 정해진 크기가 없으면 `1440x900`, `390x900`, `390x600`으로 확인한다.
+2. `agent-browser --session <세션>`으로 전용 세션을 만든다. 웹사이트는 주소를 열고, Electron 앱은 `agent-browser --session <세션> connect <포트>`로 로컬 DevTools 포트에 연결한 뒤 앱 탭을 선택한다. 앱이 꺼져 있다면 프로젝트의 개발 실행 안내를 따른다. 조작하기 전에 대상이 맞는지 확인한다.
+3. `snapshot`으로 화면을 확인하며 탭 이동이나 메뉴 열기처럼 설정값을 저장하지 않는 조작으로 사용자가 말한 곳까지 이동한다. 요청한 제목, 모달 또는 메뉴가 열렸는지 보고, 그 상태를 식별할 CSS 선택자를 `--require`에 지정한다.
+4. 검증한 화면과 상태가 드러나는 짧은 검사 이름을 직접 짓는다. 예를 들어 Morrow의 설정에서 언어 목록을 연 화면은 `설정-일반-언어-목록`이다. 이름에 붙임표(`-`)로 단어를 이어 쓴다. 검사 대상 프로젝트의 루트에서 아래 명령을 실행한다.
 
-The report distinguishes a captured requested size, a size mismatch, and an unverified capture. Keep a mismatch screenshot as evidence of the size the app actually allowed. If the screen or Electron target cannot be reached, say what blocked verification. Browser setup: `agent-browser install` after installing the CLI.
+   ```bash
+   python3 <스킬-폴더>/scripts/capture.py --session <세션> --name <검사-이름> --require '<선택자>' <너비>x<높이> ...
+   ```
+
+   Electron의 실제 창을 조절할 때는 새 세션에서 기기나 페이지 영역을 따로 설정하지 않고 `--electron`을 붙인다. 창 크기가 바뀌면서 메뉴가 닫히면, 값을 저장하지 않고 메뉴만 다시 여는 버튼을 확인해서 `--reopen '<버튼-선택자>'`를 붙인다. 캡처를 마치면 스크립트가 처음 크기로 되돌린다.
+
+5. 결과는 프로젝트의 `.geomjeung/YYYY-MM-DD/<검사-이름>/`에 저장된다. 날짜는 실행한 컴퓨터의 현지 날짜다. 같은 날 같은 이름으로 다시 실행하면 `-2`, `-3`을 붙여 이전 결과를 보존한다. 요청 크기, 실제로 측정한 크기, 스크린샷과 `report.json` 경로를 알려준다. Electron에서는 실제 창 크기와 앱 내용이 보이는 영역의 크기를 각각 기록한다.
+
+스크립트는 화면을 캡처했는지, 요청한 크기와 실제 크기가 다른지, 검사를 진행하지 못했는지를 기록한다. 크기가 달라도 실제 화면을 찍었다면 스크린샷을 남긴다. 화면이 깨진 이유를 조사할 때는 같은 대상을 Chrome DevTools MCP로 열어 스크린샷이나 화면 요소의 측정값을 근거로 설명한다.
+
+처음 쓰는 환경이라면 `agent-browser` CLI를 설치한 뒤 `agent-browser install`로 브라우저를 준비한다.

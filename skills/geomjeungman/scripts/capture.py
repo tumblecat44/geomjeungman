@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+from datetime import date
 import json
 from pathlib import Path
 import re
 import subprocess
-import tempfile
 
 
 def size(value):
@@ -12,6 +12,25 @@ def size(value):
     if not match:
         raise argparse.ArgumentTypeError("Use WIDTHxHEIGHT, for example 640x600.")
     return [int(part) for part in match.groups()]
+
+
+def run_name(value):
+    if not re.fullmatch(r"[^\W_]+(?:-[^\W_]+)*", value) or len(value.encode("utf-8")) > 120:
+        raise argparse.ArgumentTypeError("Use a short name joined by hyphens, such as settings-language-menu.")
+    return value
+
+
+def output_directory(name):
+    day = Path.cwd() / ".geomjeung" / date.today().isoformat()
+    day.mkdir(parents=True, exist_ok=True)
+    index = 1
+    while True:
+        directory = day / (name if index == 1 else f"{name}-{index}")
+        try:
+            directory.mkdir()
+            return directory
+        except FileExistsError:
+            index += 1
 
 
 def browser(session, *command):
@@ -137,20 +156,16 @@ def capture(args, directory):
 def main():
     parser = argparse.ArgumentParser(description="Capture the current screen at several sizes.")
     parser.add_argument("--session", required=True, help="Open agent-browser session name")
+    parser.add_argument("--name", required=True, type=run_name, help="Run name under .geomjeung/YYYY-MM-DD")
     parser.add_argument("--require", help="CSS selector that must stay visible")
     parser.add_argument("--reopen", help="Click this CSS selector if resizing closes the required menu")
     parser.add_argument("--electron", action="store_true", help="Resize the native Electron window")
-    parser.add_argument("--output", type=Path, help="New output directory (defaults to a temporary directory)")
     parser.add_argument("sizes", nargs="+", type=size, metavar="WIDTHxHEIGHT")
     args = parser.parse_args()
     if args.reopen and not args.require:
         parser.error("--reopen requires --require.")
     try:
-        if args.output:
-            directory = args.output.resolve()
-            directory.mkdir(parents=True)
-        else:
-            directory = Path(tempfile.mkdtemp(prefix="geomjeungman-"))
+        directory = output_directory(args.name)
         report, exit_code = capture(args, directory)
         report["report"] = str(directory / "report.json")
         output = json.dumps(report, ensure_ascii=False, indent=2)
