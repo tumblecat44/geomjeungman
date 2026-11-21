@@ -65,11 +65,23 @@ main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minm
 .world { position:absolute; top:0; left:0; width:0; height:0; transform-origin: 0 0; }
 .grid { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(#dce0e5 .7px, transparent .7px); }
 .shot { position:absolute; top:0; left:0; margin:0; background: var(--paper); padding:7px; border:1px solid #dbdde0; border-radius:10px; box-shadow: 0 1px 3px #181c2510, 0 4px 12px #181c2508; }
-.shot img { display:block; width:100%; height:var(--shot-height); object-fit:contain; border-radius:5px; background:#f1f2f3; pointer-events:none; }
+.shot-media { display:grid; place-items:center; height:var(--shot-height); border-radius:5px; background:#f1f2f3; }
+.shot-surface { position:relative; width:var(--image-width); height:100%; }
+.shot img { display:block; width:100%; height:100%; border-radius:5px; object-fit:contain; pointer-events:none; }
 .shot figcaption { min-height:31px; display:flex; align-items:end; gap:7px; padding:0 2px 3px; white-space: nowrap; }
 .shot .size { font: 600 12px/1.4 ui-monospace,monospace; }
 .shot .issue { color: #77500b; font-size: 11px; }
 .shot a { margin-left:auto; color:var(--muted); font-size: 11px; cursor: pointer; }
+.shot-action { min-height:30px; margin:5px 2px 0; padding:0 8px; border:1px solid var(--line); font-size:11px; }
+.shot-action:hover { background:#f0f1f3; }
+.shot.generated { border-color:#ef995b; background:#fff2e7; }
+.generated .issue { color:#9c3b12; font-weight:700; }
+.overlays { position:absolute; inset:0; pointer-events:none; }
+.hotspot { position:absolute; min-width:0; padding:0; pointer-events:auto; cursor:pointer; border:2px solid #e1323d; border-radius:2px; box-shadow:0 0 0 1px #fff; }
+.hotspot:hover, .hotspot:focus-visible { background:#e1323d24; }
+.hotspot span { position:absolute; top:-8px; left:-8px; background:#c5232e; color:white; border-radius:50%; font-size:10px; line-height:15px; min-width:15px; padding:0 2px; }
+.issue-tip { position:fixed; z-index:5; width:max-content; max-width:min(320px, calc(100vw - 24px)); padding:10px 12px; color:#202124; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 3px 18px #20212424; pointer-events:none; overflow-wrap:anywhere; }
+.issue-tip p { margin:5px 0 0; font-size:12px; }
 .empty { z-index: 1; text-align: center; max-width: 330px; margin: 22px; padding: 15px 23px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: default; }
 .empty strong { font-size: 15px; }
 .empty p { margin: 5px 0 0; color: var(--muted); overflow-wrap: anywhere; }
@@ -82,6 +94,11 @@ dialog::backdrop { background:#2425294d; }
 .dialog-head h2 { margin:0; font-size:16px; overflow-wrap:anywhere; }
 .links { display:flex; gap:15px; color:var(--accent); }
 .notes { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.65; }
+.proposal-list { padding-left:22px; }
+.proposal-list p { margin:3px 0 10px; color:var(--muted); overflow-wrap:anywhere; }
+.proposal-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.proposal-status { color:var(--muted); font-size:12px; }
+#fix-text { margin-top:10px; width:100%; min-height:85px; resize:vertical; font:inherit; }
 @media (max-width: 650px) {
   .top { padding: 0 14px; }
   .layout { grid-template-columns: minmax(0,1fr); grid-template-rows: min(37dvh, 210px) minmax(0,1fr); }
@@ -147,10 +164,21 @@ dialog::backdrop { background:#2425294d; }
   <p class="links"><a id="report" target="_blank" rel="noopener" hidden>측정값 JSON ↗</a><a id="findings" target="_blank" rel="noopener" hidden>findings.md ↗</a></p>
   <div class="notes" id="notes-text"></div>
 </dialog>
+<div class="issue-tip" id="issue-tip" role="tooltip" hidden><strong id="issue-problem"></strong><p id="issue-suggestion"></p></div>
+<dialog id="proposals">
+  <div class="dialog-head"><h2>모든 제안 반영 미리보기</h2><form method="dialog"><button class="icon-btn" aria-label="닫기">×</button></form></div>
+  <ol class="proposal-list" id="proposal-list"></ol>
+  <div class="proposal-actions">
+    <button class="secondary" id="generate-preview">이미지 생성</button>
+    <button class="secondary" id="copy-fixes" hidden>수정 요청 복사</button>
+    <span class="proposal-status" id="proposal-status" role="status"></span>
+  </div>
+  <textarea id="fix-text" readonly hidden aria-label="수정 요청"></textarea>
+</dialog>
 <script id="geomjeung-data" type="application/json">__GEOMJEUNG_DATA__</script>
 <script>
 const $ = (id) => document.getElementById(id);
-const { project, selected, runs } = JSON.parse($('geomjeung-data').textContent);
+const { project, selected, runs, previewEnabled } = JSON.parse($('geomjeung-data').textContent);
 const grouped = new Map();
 for (const run of runs) {
   if (!grouped.has(run.day)) grouped.set(run.day, []);
@@ -170,6 +198,22 @@ let camera = { x: 0, y: 0, scale: 1 };
 let drag = null;
 let markedMode = true;
 let layer = 0;
+let proposalShot = null;
+const pendingPreviews = new Set();
+
+function hideIssue() { $('issue-tip').hidden = true; }
+function showIssue(marker, issue) {
+  if (drag) return;
+  $('issue-problem').textContent = issue.problem;
+  $('issue-suggestion').textContent = issue.suggestion;
+  const tip = $('issue-tip');
+  tip.hidden = false;
+  const box = marker.getBoundingClientRect();
+  const left = Math.max(12, Math.min(box.left, innerWidth - tip.offsetWidth - 12));
+  const top = box.bottom + tip.offsetHeight + 20 < innerHeight ? box.bottom + 8 : box.top - tip.offsetHeight - 8;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${Math.max(12, top)}px`;
+}
 
 function readPositions() {
   if (saved.has(run.id)) return saved.get(run.id);
@@ -239,6 +283,7 @@ function position(card) {
 }
 
 function updateCamera() {
+  hideIssue();
   const { x, y, scale } = camera;
   world.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
   const cell = Math.max(10, 20 * scale);
@@ -273,18 +318,24 @@ function zoom(factor, x = viewport.clientWidth / 2, y = viewport.clientHeight / 
 }
 
 function updateImages() {
-  for (const { shot, img } of cards) {
-    const source = markedMode && shot.marked ? shot.marked : shot.src;
+  hideIssue();
+  for (const { shot, img, overlays } of cards) {
+    const source = markedMode && shot.marked && !shot.issues?.length ? shot.marked : shot.src;
     if (img.getAttribute('src') !== source) img.src = source;
+    overlays.hidden = !markedMode || !shot.issues?.length;
   }
   $('toggle-marked').textContent = markedMode ? '원본 보기' : '표시 보기';
   $('toggle-marked').setAttribute('aria-pressed', String(markedMode));
 }
 
 function draw() {
+  hideIssue();
   world.replaceChildren();
   layer = 0;
-  const shots = run?.shots || [];
+  const originals = run?.shots || [];
+  const shots = [...originals, ...originals.flatMap(shot => shot.preview ? [{
+    ...shot.preview, name: `${shot.name} · 생성 미리보기`, generated: true, original: shot,
+  }] : [])];
   cards = [];
   let x = 0, y = 0, rowHeight = 0;
   const previous = run ? readPositions() : {};
@@ -295,36 +346,70 @@ function draw() {
     const height = Math.min(355, width / ratio);
     const node = document.createElement('figure');
     const img = new Image();
+    const media = document.createElement('div');
+    const surface = document.createElement('div');
+    const overlays = document.createElement('div');
     const caption = document.createElement('figcaption');
     const size = document.createElement('span');
     const info = document.createElement('span');
     const link = document.createElement('a');
     const item = previous?.[shot.src];
-    node.className = 'shot';
+    node.className = shot.generated ? 'shot generated' : 'shot';
     node.style.width = `${width + 16}px`;
     node.style.setProperty('--shot-height', `${height}px`);
+    node.style.setProperty('--image-width', `${Math.min(width, height * ratio)}px`);
     node.tabIndex = 0;
     img.alt = shot.name;
     img.draggable = false;
+    media.className = 'shot-media';
+    surface.className = 'shot-surface';
+    overlays.className = 'overlays';
+    for (const [number, issue] of (shot.issues || []).entries()) {
+      const [left, top, boxWidth, boxHeight] = issue.box;
+      const marker = document.createElement('button');
+      marker.className = 'hotspot';
+      marker.setAttribute('aria-label', `${number + 1}. ${issue.problem} 수정 제안: ${issue.suggestion}`);
+      marker.style.left = `${left * 100 / w}%`;
+      marker.style.top = `${top * 100 / h}%`;
+      marker.style.width = `${boxWidth * 100 / w}%`;
+      marker.style.height = `${boxHeight * 100 / h}%`;
+      const label = document.createElement('span');
+      label.textContent = number + 1;
+      label.setAttribute('aria-hidden', 'true');
+      marker.append(label);
+      marker.onpointerenter = marker.onfocus = () => showIssue(marker, issue);
+      marker.onpointerleave = marker.onblur = hideIssue;
+      marker.onclick = () => openProposals(shot);
+      overlays.append(marker);
+    }
+    surface.append(img, overlays);
+    media.append(surface);
     size.className = 'size';
-    size.textContent = (shot.actual || shot.requested || shot.pixels)?.join(' × ') || shot.name;
+    size.textContent = (shot.original?.actual || shot.actual || shot.requested || shot.pixels)?.join(' × ') || shot.name;
     info.className = 'issue';
-    info.textContent = shot.mismatch ? '크기 다름' : (shot.marked ? '문제 표시' : '');
+    info.textContent = shot.generated ? '생성 미리보기' : shot.issues?.length ? `문제 ${shot.issues.length}건` : shot.mismatch ? '크기 다름' : (shot.marked ? '문제 표시' : '');
     if (shot.mismatch && shot.requested) node.title = `요청 크기 ${shot.requested.join(' × ')}`;
     link.href = shot.src;
     link.target = '_blank';
     link.rel = 'noopener';
-    link.textContent = '원본 ↗';
-    link.setAttribute('aria-label', `${shot.name} 원본 열기`);
+    link.textContent = shot.generated ? '이미지 ↗' : '원본 ↗';
+    link.setAttribute('aria-label', `${shot.name} 이미지 열기`);
     caption.append(size, info, link);
-    node.append(img, caption);
+    node.append(media, caption);
+    if (shot.issues?.length || shot.generated) {
+      const action = document.createElement('button');
+      action.className = 'shot-action';
+      action.textContent = shot.generated ? '수정 제안 보기' : '어떻게 변할지 보기';
+      action.onclick = () => openProposals(shot.original || shot);
+      node.append(action);
+    }
     world.append(node);
     const stored = Array.isArray(item) && item.length === 2 && item.every(Number.isFinite);
-    const card = { shot, img, node, x: stored ? item[0] : x, y: stored ? item[1] : y };
+    const card = { shot, img, overlays, node, x: stored ? item[0] : x, y: stored ? item[1] : y };
     cards.push(card);
     position(card);
     x += width + 38;
-    rowHeight = Math.max(rowHeight, height + 48);
+    rowHeight = Math.max(rowHeight, node.offsetHeight);
     if (index % 3 === 2) { x = 0; y += rowHeight + 24; rowHeight = 0; }
     node.addEventListener('keydown', (event) => {
       const delta = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] }[event.key];
@@ -338,8 +423,8 @@ function draw() {
     });
   }
   $('run-title').textContent = run?.title || '검사 기록';
-  $('meta').textContent = run ? `${run.day} · 스크린샷 ${shots.length}장` : '';
-  $('toggle-marked').hidden = !shots.some(shot => shot.marked);
+  $('meta').textContent = run ? `${run.day} · 스크린샷 ${originals.length}장` : '';
+  $('toggle-marked').hidden = !originals.some(shot => shot.marked || shot.issues?.length);
   $('show-notes').hidden = !(run?.findingsPath || run?.report);
   $('canvas-bar').hidden = !shots.length;
   $('empty').hidden = Boolean(shots.length);
@@ -349,6 +434,74 @@ function draw() {
   updateImages();
   fit();
 }
+
+function updateProposalControls(error = '') {
+  const pending = pendingPreviews.has(proposalShot.src);
+  $('generate-preview').disabled = pending || !previewEnabled;
+  $('generate-preview').textContent = pending ? '생성 중…' : proposalShot.preview ? '캔버스에서 보기' : '이미지 생성';
+  $('copy-fixes').hidden = !proposalShot.preview;
+  $('proposal-status').textContent = error || (pending ? 'Codex가 원본과 모든 제안을 바탕으로 이미지를 만들고 있어요.' :
+    proposalShot.preview ? '이미지는 수정 후 모습을 가늠하기 위한 시안입니다.' :
+    !previewEnabled ? '이미지를 만들려면 dashboard.py를 --serve --open으로 실행하세요.' : '이미지를 만들면 원본과 이 수정 제안이 Codex에 전달됩니다.');
+  if (proposalShot.preview && !pending) $('generate-preview').disabled = false;
+}
+
+function openProposals(shot) {
+  hideIssue();
+  proposalShot = shot;
+  $('fix-text').hidden = true;
+  const entries = shot.issues.map(issue => {
+    const item = document.createElement('li');
+    const title = document.createElement('strong');
+    const detail = document.createElement('p');
+    title.textContent = issue.problem;
+    detail.textContent = issue.suggestion;
+    item.append(title, detail);
+    return item;
+  });
+  $('proposal-list').replaceChildren(...entries);
+  updateProposalControls();
+  $('proposals').showModal();
+}
+
+$('generate-preview').onclick = async () => {
+  const shot = proposalShot;
+  if (shot.preview) { $('proposals').close(); fit(); return; }
+  if (!previewEnabled || pendingPreviews.has(shot.src)) return;
+  pendingPreviews.add(shot.src);
+  updateProposalControls();
+  let error = '';
+  try {
+    const response = await fetch('preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({shot: shot.src}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '이미지를 만들지 못했습니다.');
+    shot.preview = data.preview;
+    if (run?.shots.includes(shot)) { savePositions(); draw(); }
+    if (proposalShot === shot) $('proposals').close();
+  } catch (failure) {
+    error = failure instanceof SyntaxError || failure instanceof TypeError ? '로컬 관제탑에 연결할 수 없습니다.' : failure.message;
+  } finally {
+    pendingPreviews.delete(shot.src);
+    if (proposalShot === shot) updateProposalControls(error);
+  }
+};
+
+$('copy-fixes').onclick = async () => {
+  const shot = proposalShot;
+  const text = [`${run.title} 화면에서 아래 레이아웃 문제를 수정해줘.`, shot.context,
+    ...shot.issues.map((issue, i) => `${i + 1}. ${issue.problem}\n   ${issue.suggestion}`)].filter(Boolean).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    $('proposal-status').textContent = '수정 요청을 복사했어요.';
+  } catch {
+    $('fix-text').value = text;
+    $('fix-text').hidden = false;
+    $('fix-text').focus();
+    $('fix-text').select();
+  }
+};
 
 function select(item) {
   run = item;
@@ -377,6 +530,7 @@ $('fit').onclick = fit;
 viewport.addEventListener('pointerdown', event => {
   if (drag || !cards.length || (event.button !== 0 && event.button !== 1) || event.target.closest('button,a,.empty,.canvas-bar')) return;
   const view = event.target.closest('.shot');
+  hideIssue();
   const card = event.button === 0 ? cards.find(item => item.node === view) : null;
   if (card) card.node.style.zIndex = ++layer;
   drag = {

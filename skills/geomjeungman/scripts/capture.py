@@ -107,7 +107,7 @@ def capture(args, directory):
     exit_code = 0
     try:
         for index, requested in enumerate(args.sizes, start=1):
-            entry = {"requested": requested}
+            entry = {"requested": requested, "issues": []}
             report["captures"].append(entry)
             try:
                 verify_page(measure(args.session, None), original)
