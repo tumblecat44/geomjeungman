@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from base64 import b64encode
 from datetime import date
 import json
 from pathlib import Path
@@ -112,7 +113,9 @@ def main():
         data = {"project": project.name, "selected": selected, "runs": runs}
         payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
         template = Path(__file__).resolve().parents[1] / "assets" / "dashboard.html"
-        document = template.read_text(encoding="utf-8").replace("__GEOMJEUNG_DATA__", payload, 1)
+        cursor = b64encode(template.with_name("sengi-cursor.svg").read_bytes()).decode("ascii")
+        document = template.read_text(encoding="utf-8")
+        document = document.replace("__GEOMJEUNG_CURSOR__", cursor, 1).replace("__GEOMJEUNG_DATA__", payload, 1)
         output = root / "index.html"
         with NamedTemporaryFile(mode="w", encoding="utf-8", dir=root, delete=False) as temp:
             temp.write(document)
