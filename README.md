@@ -16,6 +16,8 @@ npx skills add tumblecat44/geomjeungman
 
 검사가 끝나면 `.geomjeung/index.html`이 열립니다. 왼쪽에서 날짜와 검사를 고르고, 캔버스에서 스크린샷을 옮기거나 확대해 비교할 수 있습니다.
 
+`geomjeungman-dashboard` 스킬을 `geomjeungman`과 함께 설치하면 로컬 웹 서버를 켜고 끌 수 있습니다. 검사 대상 프로젝트에서 “검증 관제탑 켜줘” 또는 “검증 관제탑 꺼줘”라고 요청하세요. [관제탑 스킬 안내서](skills/geomjeungman-dashboard/SKILL.md)
+
 ![검증 관제탑의 430 × 480 검사 예시. 왼쪽 원본에는 빨간 문제 표시와 언어 버튼의 수정 제안이 보이고, 오른쪽에는 주황색 시안 카드가 있다.](assets/dashboard-preview.png)
 
 빨간 박스에 마우스를 올리면 해당 위치의 문제와 수정 제안이 보입니다. **어떻게 변할지 보기**에서 **이미지 생성**을 누르면 수정 제안을 반영한 시안이 원본 옆에 주황색 카드로 나타납니다.

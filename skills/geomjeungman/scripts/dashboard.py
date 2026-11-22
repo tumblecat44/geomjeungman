@@ -106,6 +106,7 @@ def main():
     parser.add_argument("--run", type=Path, help="처음에 열 검사 폴더의 경로")
     parser.add_argument("--open", action="store_true", help="완성된 HTML을 기본 브라우저에서 엽니다.")
     parser.add_argument("--serve", action="store_true", help="로컬에서 Codex 미리보기 버튼을 활성화합니다.")
+    parser.add_argument("--session-fd", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     project = Path.cwd()
     root = (project / ".geomjeung").resolve()
@@ -136,7 +137,7 @@ def main():
         print(output)
         if args.serve:
             from dashboard_server import serve
-            serve(root, data, render, write_index, args.open)
+            serve(root, data, render, write_index, args.open, args.session_fd)
         elif args.open and not webbrowser.open(output.as_uri()):
             raise OSError("브라우저를 열지 못했습니다. 위 HTML 파일을 직접 여세요.")
     except (OSError, ValueError) as error:

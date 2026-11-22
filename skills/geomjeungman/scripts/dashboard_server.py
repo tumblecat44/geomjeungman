@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from mimetypes import guess_type
+import os
 from secrets import token_urlsafe
 from subprocess import TimeoutExpired
 from threading import Lock
@@ -10,7 +11,7 @@ import webbrowser
 from preview import destination, generate, screenshot_size
 
 
-def serve(root, data, render, write_index, open_browser):
+def serve(root, data, render, write_index, open_browser, session_fd=None):
     root = root.resolve()
     assets = set()
     shots = {}
@@ -108,6 +109,13 @@ def serve(root, data, render, write_index, open_browser):
         if open_browser:
             webbrowser.open(url)
         try:
-            server.serve_forever()
+            if session_fd is None:
+                server.serve_forever()
+            else:
+                os.write(session_fd, (url + "\n").encode("ascii"))
+                server.timeout = 0.25
+                # The controller unlinks the session file to stop this server.
+                while os.fstat(session_fd).st_nlink:
+                    server.handle_request()
         except KeyboardInterrupt:
             pass
