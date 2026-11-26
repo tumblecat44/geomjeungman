@@ -74,6 +74,7 @@ def collect_run(root, day, folder):
         "id": folder.relative_to(root).as_posix(),
         "day": day,
         "title": folder.name,
+        "incomplete": report.get("stage") in ("capturing", "awaiting_review"),
         "updated": max(path.stat().st_mtime_ns for path in files.values()),
         "shots": shots,
         "report": link(report_file) if report_file.name in files else None,

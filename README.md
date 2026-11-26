@@ -8,7 +8,7 @@
 npx skills add tumblecat44/geomjeungman
 ```
 
-자동 캡처에는 Python 3와 `agent-browser`가 필요합니다. `agent-browser`를 처음 쓴다면 CLI를 설치한 뒤 `agent-browser install`로 브라우저를 준비하세요.
+자동 캡처는 Python 3와 Agent Browser로 실행합니다. Agent Browser가 크기를 바꾸고 실측값과 PNG를 저장합니다. Agent Browser가 없으면 스크립트가 npm으로 설치합니다. Chrome DevTools MCP는 성능, 콘솔 오류, 네트워크 로그를 확인하는 데 씁니다.
 
 > 검증맨, `http://localhost:3000/pricing`에서 가격표가 작은 화면에서도 잘리지 않는지 확인해줘.
 

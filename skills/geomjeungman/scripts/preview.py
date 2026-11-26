@@ -5,14 +5,32 @@ import shutil
 from struct import unpack
 import subprocess
 from tempfile import TemporaryDirectory
+from zlib import crc32
 
 
 def screenshot_size(path):
     with path.open("rb") as image:
-        header = image.read(24)
-    if len(header) != 24 or header[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
-        return None
-    return list(unpack(">II", header[16:24]))
+        if image.read(8) != b"\x89PNG\r\n\x1a\n":
+            return None
+        dimensions = None
+        has_pixels = False
+        while len(header := image.read(8)) == 8:
+            length, kind = unpack(">I4s", header)
+            if length > path.stat().st_size - image.tell() - 4:
+                return None
+            payload = image.read(length)
+            checksum = image.read(4)
+            if len(checksum) != 4 or crc32(kind + payload) != unpack(">I", checksum)[0]:
+                return None
+            if dimensions is None:
+                if kind != b"IHDR" or length != 13:
+                    return None
+                dimensions = list(unpack(">II", payload[:8]))
+            elif kind == b"IDAT" and length:
+                has_pixels = True
+            elif kind == b"IEND":
+                return dimensions if has_pixels and length == 0 and all(dimensions) else None
+    return None
 
 
 def shot_issues(entries, pixels):

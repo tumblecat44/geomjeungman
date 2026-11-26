@@ -279,7 +279,7 @@ function list() {
     name.className = 'run-name';
     name.textContent = item.title;
     count.className = 'run-count';
-    count.textContent = `${item.shots.length}장`;
+    count.textContent = item.incomplete ? '미완료' : `${item.shots.length}장`;
     button.className = 'run';
     button.setAttribute('aria-current', String(item.id === run?.id));
     button.append(name, count);
@@ -433,7 +433,7 @@ function draw() {
     });
   }
   $('run-title').textContent = run?.title || '검사 기록';
-  $('meta').textContent = run ? `${run.day} · 스크린샷 ${originals.length}장` : '';
+  $('meta').textContent = run ? `${run.day} · 스크린샷 ${originals.length}장${run.incomplete ? ' · 미완료' : ''}` : '';
   $('toggle-marked').hidden = !originals.some(shot => shot.marked || shot.issues?.length);
   $('show-notes').hidden = !(run?.findingsPath || run?.report);
   $('canvas-bar').hidden = !shots.length;
